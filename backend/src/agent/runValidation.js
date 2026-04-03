@@ -10,7 +10,7 @@ const PYTHON_SERVICE_URL = pythonBase ? `${pythonBase}/extract` : pythonFallback
 const extractFromPython = async (fileBuffer, filename) => {
     const formData = new FormData();
     formData.append("file", fileBuffer, { filename });
-    
+
     try {
         const response = await axios.post(PYTHON_SERVICE_URL, formData, {
             headers: formData.getHeaders(),
@@ -37,7 +37,7 @@ const compareJsonLists = (mstr, meta) => {
     // Check presence of keywords / values from MSTR in Metabase
     const mstrTokens = mstrTextMap.split(/\s+/).filter(w => w.length > 2);
     totalFields = mstrTokens.length || 1; // Prevent div by 0
-    
+
     for (const token of mstrTokens) {
         if (metaTextMap.includes(token)) {
             matchFields++;
@@ -47,7 +47,7 @@ const compareJsonLists = (mstr, meta) => {
             }
         }
     }
-    
+
     const dataMatchPercentage = Math.round((matchFields / totalFields) * 100);
     return {
         matchPercentage: Math.min(dataMatchPercentage, 100),
@@ -62,7 +62,7 @@ const compareBase64Images = (b64Image1, b64Image2) => {
 
     let img1 = PNG.sync.read(buf1);
     let img2 = PNG.sync.read(buf2);
-    
+
     // Safely pad images to the same maximum dimensions before pixelmatch compares them.
     const width = Math.max(img1.width, img2.width);
     const height = Math.max(img1.height, img2.height);
@@ -70,10 +70,10 @@ const compareBase64Images = (b64Image1, b64Image2) => {
     if (img1.width !== img2.width || img1.height !== img2.height) {
         const padImage = (img, targetWidth, targetHeight) => {
             const newImg = new PNG({ width: targetWidth, height: targetHeight });
-            
+
             // Rapidly fill the background with transparent pixels natively
             newImg.data.fill(0); // Optional: if you want transparent black (0,0,0,0)
-            
+
             // Fast contiguous row-wise memory copy instead of pixel-by-pixel
             for (let y = 0; y < img.height; y++) {
                 const srcStart = y * img.width * 4;
@@ -87,9 +87,9 @@ const compareBase64Images = (b64Image1, b64Image2) => {
         img1 = padImage(img1, width, height);
         img2 = padImage(img2, width, height);
     }
-    
+
     const diff = new PNG({ width, height });
-    
+
     const numDiffPixels = pixelmatch(
         img1.data,
         img2.data,
@@ -98,13 +98,13 @@ const compareBase64Images = (b64Image1, b64Image2) => {
         height,
         { threshold: 0.1 }
     );
-    
+
     const diffBuf = PNG.sync.write(diff);
     const diffBase64 = `data:image/png;base64,${diffBuf.toString("base64")}`;
-    
+
     const totalPixels = width * height;
     const matchPercentage = Math.round(((totalPixels - numDiffPixels) / totalPixels) * 100);
-    
+
     return {
         matchPercentage,
         diffBase64
@@ -113,12 +113,12 @@ const compareBase64Images = (b64Image1, b64Image2) => {
 
 export const runValidation = async (mstrFile, metabaseFile) => {
     console.log("Starting PDF Extraction...");
-    
+
     const [mstrData, metaData] = await Promise.all([
         extractFromPython(mstrFile.buffer, mstrFile.originalname),
         extractFromPython(metabaseFile.buffer, metabaseFile.originalname)
     ]);
-    
+
     console.log("Comparing Data...");
     const dataComparison = compareJsonLists(mstrData, metaData);
 
