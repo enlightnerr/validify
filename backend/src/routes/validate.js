@@ -1,38 +1,26 @@
 import express from "express";
 import multer from "multer";
-import path from "path";
 import { runValidation } from "../agent/runValidation.js";
 
 const router = express.Router();
 
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        cb(null, path.join(process.cwd(), "outputs"));
-    },
-    filename: (req, file, cb) => {
-        if (file.fieldname === "mstrPdf") {
-            cb(null, "mstr.pdf");
-        } else if (file.fieldname === "metabasePdf") {
-            cb(null, "metabase.pdf");
-        } else {
-            cb(null, file.originalname);
-        }
-    }
-});
+const storage = multer.memoryStorage();
+const upload = multer({ storage, limits: { fileSize: 10 * 1024 * 1024 } }); // 10MB limit
 
-const upload = multer({ storage });
-
-router.post("/", upload.fields([{ name: 'mstrPdf', maxCount: 1 }, { name: 'metabasePdf', maxCount: 1 }]), async (req, res) => {
-    const { mstrUrl = "", metabaseUrl = "" } = req.body || {};
-    const hasMstrPdf = !!(req.files && req.files['mstrPdf']);
-    const hasMetabasePdf = !!(req.files && req.files['metabasePdf']);
-
+router.post("/", upload.fields([{ name: 'mstrFile', maxCount: 1 }, { name: 'metabaseFile', maxCount: 1 }]), async (req, res) => {
     try {
-        const result = await runValidation(mstrUrl, metabaseUrl, hasMstrPdf, hasMetabasePdf);
+        const mstrFile = req.files && req.files['mstrFile'] ? req.files['mstrFile'][0] : null;
+        const metabaseFile = req.files && req.files['metabaseFile'] ? req.files['metabaseFile'][0] : null;
+
+        if (!mstrFile || !metabaseFile) {
+            return res.status(400).json({ error: "Both mstrFile and metabaseFile are required" });
+        }
+
+        const result = await runValidation(mstrFile, metabaseFile);
         res.json(result);
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: "Validation failed" });
+        res.status(500).json({ error: "Validation failed", details: err.message });
     }
 });
 

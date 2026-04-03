@@ -1,49 +1,116 @@
-import { captureUI } from "./capture.js";
-import { compareImages } from "./compareImages.js";
-import { validatePdf } from "./validatePdf.js";
+import axios from "axios";
+import FormData from "form-data";
+import pixelmatch from "pixelmatch";
+import { PNG } from "pngjs";
 
-export const runValidation = async (mstrUrl, metabaseUrl, hasMstrPdf, hasMetabasePdf) => {
-    // Capture concurrently to save time, passing skip flags
-    await Promise.all([
-        captureUI(mstrUrl, "mstr", hasMstrPdf),
-        captureUI(metabaseUrl, "metabase", hasMetabasePdf)
-    ]);
+const PYTHON_SERVICE_URL = "http://127.0.0.1:8000/extract";
 
-    // 🖼️ UI Validation
-    let uiStatus = "N/A";
-    let mismatch = 0;
+const extractFromPython = async (fileBuffer, filename) => {
+    const formData = new FormData();
+    formData.append("file", fileBuffer, { filename });
     
-    // Only attempt UI validation if both URLs were provided
-    if (mstrUrl && metabaseUrl) {
-        mismatch = compareImages();
-        uiStatus = "FAIL";
-        if (mismatch === -1) {
-            uiStatus = "ERROR";
-        } else if (mismatch < 1000) {
-            uiStatus = "PASS";
+    try {
+        const response = await axios.post(PYTHON_SERVICE_URL, formData, {
+            headers: formData.getHeaders(),
+            maxBodyLength: Infinity,
+            maxContentLength: Infinity
+        });
+        return response.data;
+    } catch (e) {
+        console.error(`Error extracting from ${filename}:`, e.message);
+        throw new Error(`Failed to extract data from ${filename} via Python service`);
+    }
+};
+
+const compareJsonLists = (mstr, meta) => {
+    // Basic comparison logic: we check table dimensions and content similarity
+    let totalFields = 0;
+    let matchFields = 0;
+    const differences = [];
+
+    // Simple textual comparison for MVP
+    const mstrTextMap = mstr.text.map(t => t.text).join(" ");
+    const metaTextMap = meta.text.map(t => t.text).join(" ");
+
+    // Check presence of keywords / values from MSTR in Metabase
+    const mstrTokens = mstrTextMap.split(/\s+/).filter(w => w.length > 2);
+    totalFields = mstrTokens.length || 1; // Prevent div by 0
+    
+    for (const token of mstrTokens) {
+        if (metaTextMap.includes(token)) {
+            matchFields++;
+        } else {
+            if (differences.length < 50) { // Limit diff sizes
+                differences.push({ expected: token, found: "Missing" });
+            }
         }
     }
-
-    // 📄 PDF Validation
-    // This expects outputs/mstr.pdf and outputs/metabase.pdf to exist
-    // They will exist either via upload from multer or from captureUI
-    const pdfResults = await validatePdf();
-
-    const pdfStatus = pdfResults.every(r => r.status === "PASS")
-        ? "PASS"
-        : "FAIL";
-
+    
+    const dataMatchPercentage = Math.round((matchFields / totalFields) * 100);
     return {
-        ui: {
-            mismatch,
-            status: uiStatus,
-            diffImage: uiStatus !== "N/A" && uiStatus !== "ERROR" ? "/outputs/diff.png" : null,
-            mstrImage: uiStatus !== "N/A" ? "/outputs/mstr.png" : null,
-            metaImage: uiStatus !== "N/A" ? "/outputs/metabase.png" : null
-        },
-        pdf: {
-            status: pdfStatus,
-            details: pdfResults
-        }
+        matchPercentage: Math.min(dataMatchPercentage, 100),
+        differences
+    };
+};
+
+const compareBase64Images = (b64Image1, b64Image2) => {
+    // Strip data prefix
+    const buf1 = Buffer.from(b64Image1.replace(/^data:image\/png;base64,/, ""), "base64");
+    const buf2 = Buffer.from(b64Image2.replace(/^data:image\/png;base64,/, ""), "base64");
+
+    const img1 = PNG.sync.read(buf1);
+    const img2 = PNG.sync.read(buf2);
+    
+    const { width, height } = img1;
+    // Assume both images have same dimensions for simplicity in MVP
+    
+    const diff = new PNG({ width, height });
+    
+    const numDiffPixels = pixelmatch(
+        img1.data,
+        img2.data,
+        diff.data,
+        width,
+        height,
+        { threshold: 0.1 }
+    );
+    
+    const diffBuf = PNG.sync.write(diff);
+    const diffBase64 = `data:image/png;base64,${diffBuf.toString("base64")}`;
+    
+    const totalPixels = width * height;
+    const matchPercentage = Math.round(((totalPixels - numDiffPixels) / totalPixels) * 100);
+    
+    return {
+        matchPercentage,
+        diffBase64
+    };
+};
+
+export const runValidation = async (mstrFile, metabaseFile) => {
+    console.log("Starting PDF Extraction...");
+    
+    const [mstrData, metaData] = await Promise.all([
+        extractFromPython(mstrFile.buffer, mstrFile.originalname),
+        extractFromPython(metabaseFile.buffer, metabaseFile.originalname)
+    ]);
+    
+    console.log("Comparing Data...");
+    const dataComparison = compareJsonLists(mstrData, metaData);
+
+    console.log("Comparing Visuals...");
+    // For MVP, limit to comparing the first page
+    let visualComparison = { matchPercentage: 100, diffBase64: null };
+    if (mstrData.images.length > 0 && metaData.images.length > 0) {
+        visualComparison = compareBase64Images(mstrData.images[0], metaData.images[0]);
+    }
+
+    // Return the required structure
+    return {
+        dataMatchPercentage: dataComparison.matchPercentage,
+        visualMatchPercentage: visualComparison.matchPercentage,
+        jsonDiff: dataComparison.differences,
+        visualDiffImage: visualComparison.diffBase64,
+        summary: `Compared ${mstrData.pageCount} pages. Data Match: ${dataComparison.matchPercentage}%. Visual Match: ${visualComparison.matchPercentage}%.`
     };
 };
