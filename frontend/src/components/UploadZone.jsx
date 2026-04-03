@@ -5,17 +5,19 @@ const UploadZone = ({ onUpload }) => {
   const [mstrFile, setMstrFile] = useState(null);
   const [metaFile, setMetaFile] = useState(null);
 
+  const isValidFile = (file) => file && (file.type === "application/pdf" || file.name.endsWith(".xlsx") || file.name.endsWith(".csv"));
+
   const handleDrop = (e, type) => {
     e.preventDefault();
     const file = e.dataTransfer.files[0];
-    if (file && file.type === "application/pdf") {
+    if (isValidFile(file)) {
       type === 'mstr' ? setMstrFile(file) : setMetaFile(file);
     }
   };
 
   const handleChange = (e, type) => {
     const file = e.target.files[0];
-    if (file && file.type === "application/pdf") {
+    if (isValidFile(file)) {
       type === 'mstr' ? setMstrFile(file) : setMetaFile(file);
     }
   };
@@ -44,9 +46,9 @@ const UploadZone = ({ onUpload }) => {
           ) : (
             <div className="upload-prompt">
               <FiUploadCloud className="upload-icon" />
-              <h3>MicroStrategy PDF</h3>
-              <p>Drag & drop or click to browse</p>
-              <input type="file" accept=".pdf" onChange={(e) => handleChange(e, 'mstr')} />
+              <h3>MicroStrategy Report</h3>
+              <p>Drag & drop or click to browse (PDF/Excel)</p>
+              <input type="file" accept=".pdf,.xlsx,.csv" onChange={(e) => handleChange(e, 'mstr')} />
             </div>
           )}
         </div>
@@ -66,9 +68,9 @@ const UploadZone = ({ onUpload }) => {
           ) : (
             <div className="upload-prompt">
               <FiUploadCloud className="upload-icon" />
-              <h3>Metabase PDF</h3>
-              <p>Drag & drop or click to browse</p>
-              <input type="file" accept=".pdf" onChange={(e) => handleChange(e, 'meta')} />
+              <h3>Metabase Report</h3>
+              <p>Drag & drop or click to browse (PDF/Excel)</p>
+              <input type="file" accept=".pdf,.xlsx,.csv" onChange={(e) => handleChange(e, 'meta')} />
             </div>
           )}
         </div>

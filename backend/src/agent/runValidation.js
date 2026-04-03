@@ -4,15 +4,22 @@ import pixelmatch from "pixelmatch";
 import { PNG } from "pngjs";
 
 const pythonBase = process.env.PYTHON_SERVICE_BASE_URL;
-const pythonFallback = process.env.PYTHON_SERVICE_URL || "http://127.0.0.1:8000/extract";
-const PYTHON_SERVICE_URL = pythonBase ? `${pythonBase}/extract` : pythonFallback;
+const pythonFallback = process.env.PYTHON_SERVICE_URL || "http://127.0.0.1:8000";
 
 const extractFromPython = async (fileBuffer, filename) => {
     const formData = new FormData();
     formData.append("file", fileBuffer, { filename });
     
+    // Determine endpoint based on extension
+    const isExcel = filename.toLowerCase().endsWith(".xlsx") || filename.toLowerCase().endsWith(".xls");
+    const endpoint = isExcel ? "/extract-excel" : "/extract";
+    
+    // Cleanly construct absolute Python URL
+    const baseUrl = pythonFallback.replace(/\/extract-excel|\/extract/g, ""); // Strip any trailing routes
+    let finalUrl = pythonBase ? `${pythonBase}${endpoint}` : `${baseUrl}${endpoint}`;
+    
     try {
-        const response = await axios.post(PYTHON_SERVICE_URL, formData, {
+        const response = await axios.post(finalUrl, formData, {
             headers: formData.getHeaders(),
             maxBodyLength: Infinity,
             maxContentLength: Infinity
