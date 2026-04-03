@@ -60,11 +60,33 @@ const compareBase64Images = (b64Image1, b64Image2) => {
     const buf1 = Buffer.from(b64Image1.replace(/^data:image\/png;base64,/, ""), "base64");
     const buf2 = Buffer.from(b64Image2.replace(/^data:image\/png;base64,/, ""), "base64");
 
-    const img1 = PNG.sync.read(buf1);
-    const img2 = PNG.sync.read(buf2);
+    let img1 = PNG.sync.read(buf1);
+    let img2 = PNG.sync.read(buf2);
     
-    const { width, height } = img1;
-    // Assume both images have same dimensions for simplicity in MVP
+    // Safely pad images to the same maximum dimensions before pixelmatch compares them.
+    const width = Math.max(img1.width, img2.width);
+    const height = Math.max(img1.height, img2.height);
+
+    if (img1.width !== img2.width || img1.height !== img2.height) {
+        const padImage = (img, targetWidth, targetHeight) => {
+            const newImg = new PNG({ width: targetWidth, height: targetHeight });
+            
+            // Rapidly fill the background with transparent pixels natively
+            newImg.data.fill(0); // Optional: if you want transparent black (0,0,0,0)
+            
+            // Fast contiguous row-wise memory copy instead of pixel-by-pixel
+            for (let y = 0; y < img.height; y++) {
+                const srcStart = y * img.width * 4;
+                const dstStart = y * targetWidth * 4;
+                const rowLength = img.width * 4;
+                img.data.copy(newImg.data, dstStart, srcStart, srcStart + rowLength);
+            }
+            return newImg;
+        };
+
+        img1 = padImage(img1, width, height);
+        img2 = padImage(img2, width, height);
+    }
     
     const diff = new PNG({ width, height });
     
