@@ -48,11 +48,11 @@ function App() {
         <div className="blob blob-1"></div>
         <div className="blob blob-2"></div>
       </div>
-      
+
       <header className="app-header fade-in">
         <div className="logo-container">
           <div className="logo-icon"><FiActivity /></div>
-          <h1>Validify<span className="text-accent">.</span></h1>
+          <h1>Validate<span className="text-accent">.</span></h1>
         </div>
         <p className="subtitle">MSTR vs Metabase Auto-Validations</p>
       </header>
@@ -80,12 +80,12 @@ function App() {
 
         {results && !loading && (
           <div className="results-container">
-            <ResultsDashboard 
-              dataMatch={results.dataMatchPercentage} 
+            <ResultsDashboard
+              dataMatch={results.dataMatchPercentage}
               visualMatch={results.visualMatchPercentage}
               summary={results.summary}
             />
-            
+
             <div className="details-grid">
               <JsonDiffViewer diffs={results.jsonDiff} />
               <VisualDiffViewer diffImage={results.visualDiffImage} />
