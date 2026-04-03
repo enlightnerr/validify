@@ -1,0 +1,29 @@
+# Render Blueprint (Infrastructure as Code)
+# Visit https://dashboard.render.com/blueprints to deploy this file
+version: "1"
+
+services:
+  # 1. Python Extraction Service (Docker)
+  - type: web
+    name: validify-python
+    env: docker
+    plan: free
+    rootDir: python-service
+    dockerfilePath: ./Dockerfile
+
+  # 2. Node.js Backend (Docker)
+  - type: web
+    name: validify-node
+    env: docker
+    plan: free
+    rootDir: backend
+    dockerfilePath: ./Dockerfile
+    envVars:
+      # Inject the python service's public URL into the Node backend
+      # We append /extract dynamically because Render passes the base URL
+      - key: PYTHON_SERVICE_BASE_URL
+        fromService:
+          type: web
+          name: validify-python
+          envVarKey: RENDER_EXTERNAL_URL
+      # In backend/src/agent/runValidation.js, we will use this base var

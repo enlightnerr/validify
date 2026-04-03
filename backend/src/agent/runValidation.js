@@ -3,7 +3,9 @@ import FormData from "form-data";
 import pixelmatch from "pixelmatch";
 import { PNG } from "pngjs";
 
-const PYTHON_SERVICE_URL = "http://127.0.0.1:8000/extract";
+const pythonBase = process.env.PYTHON_SERVICE_BASE_URL;
+const pythonFallback = process.env.PYTHON_SERVICE_URL || "http://127.0.0.1:8000/extract";
+const PYTHON_SERVICE_URL = pythonBase ? `${pythonBase}/extract` : pythonFallback;
 
 const extractFromPython = async (fileBuffer, filename) => {
     const formData = new FormData();
