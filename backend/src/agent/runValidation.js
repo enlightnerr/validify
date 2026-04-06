@@ -114,10 +114,8 @@ const compareBase64Images = (b64Image1, b64Image2) => {
 export const runValidation = async (mstrFile, metabaseFile) => {
     console.log("Starting PDF Extraction...");
 
-    const [mstrData, metaData] = await Promise.all([
-        extractFromPython(mstrFile.buffer, mstrFile.originalname),
-        extractFromPython(metabaseFile.buffer, metabaseFile.originalname)
-    ]);
+    const mstrData = await extractFromPython(mstrFile.buffer, mstrFile.originalname);
+    const metaData = await extractFromPython(metabaseFile.buffer, metabaseFile.originalname);
 
     console.log("Comparing Data...");
     const dataComparison = compareJsonLists(mstrData, metaData);

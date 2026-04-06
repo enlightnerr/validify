@@ -35,7 +35,7 @@ async def extract_pdf_data(file: UploadFile = File(...)):
                 
             # Convert page to image using pdfplumber's pypdfium2 integration
             # which produces a PIL image.
-            img = page.to_image(resolution=144).original
+            img = page.to_image(resolution=72).original
             img_byte_arr = io.BytesIO()
             img.save(img_byte_arr, format='PNG')
             b64_img = base64.b64encode(img_byte_arr.getvalue()).decode("utf-8")
